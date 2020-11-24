@@ -1,3 +1,10 @@
+# Dataset directory
+genki4k/
+
+.zip
+
+# ========== PYTHON TEMPLATE ==========
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
