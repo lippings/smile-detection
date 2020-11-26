@@ -1,7 +1,7 @@
 # Dataset directory
 genki4k/
 
-.zip
+*.zip
 .vscode/
 .idea/
 
