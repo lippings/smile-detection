@@ -2,6 +2,8 @@
 genki4k/
 
 .zip
+.vscode/
+.idea/
 
 # ========== PYTHON TEMPLATE ==========
 
