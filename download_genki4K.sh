@@ -5,10 +5,10 @@ echo ""
 echo "Downloading..."
 echo ""
 
-wget https://inc.ucsd.edu/mplab/databases/GENKI-4K.zip
+wget https://inc.ucsd.edu/mplab/databases/GENKI-R2009a.zip
 
 echo ""
 echo "Unzipping..."
 echo ""
 
-unzip GENKI-4K.zip -d genki4k
+unzip GENKI-R2009a.zip -d genki4k
