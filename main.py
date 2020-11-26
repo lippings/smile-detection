@@ -23,19 +23,39 @@ def main():
     model = SmileClassifier().float()
 
     device = config['training']['device']
+    checkpoint_callback = pl.callbacks.ModelCheckpoint(
+        monitor='val_loss',
+        dirpath=config['directories']['model_dir'],
+        filename='smile-rec-{epoch:02d}-{val_loss:.2f}',
+        save_top_k=5,
+        mode='min'
+    )
+    save_best = pl.callbacks.ModelCheckpoint(
+        monitor='val_loss',
+        dirpath=config['directories']['model_dir'],
+        filename='smile-rec-best',
+        save_top_k=1,
+        mode='min'
+    )
+
+    trainer_kawrgs = {
+        'callbacks': [checkpoint_callback, save_best],
+        'max_epochs': config['training']['epochs']
+    }
 
     if device == 'gpu':
-        trainer = pl.Trainer(gpus=1)
+        trainer_kawrgs['gpus'] = 1
     elif device == 'tpu':
-        trainer = pl.Trainer(tpu_cores=1)
-    else:
-        trainer = pl.Trainer()
+        trainer_kawrgs['tpu_cores'] = 1
+
+    trainer = pl.Trainer(**trainer_kawrgs)
     
     if config['workflow']['train']:
         trainer.fit(model, train_loader, val_loader)
     
     if config['workflow']['test']:
         for test_batch in test_loader:
+            # TODO: Confusion matrix
             pass
 
 
