@@ -10,7 +10,7 @@ directories:
 method_name: base_bnorm_no_affine
 
 load_pretrained: No
-pretrained_path:
+pretrained_path:  # Empty to use automatically saved weights based on method_name
 
 network:
   kernel_size: 7

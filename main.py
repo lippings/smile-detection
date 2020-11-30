@@ -173,6 +173,9 @@ def main():
             else:
                 model_path = config['pretrained_path']
 
+            if not Path(model_path).exists():
+                raise AttributeError(f'Could not find model weights in {model_path}')
+
             model.load_state_dict(torch.load(model_path))
 
         pred = []
