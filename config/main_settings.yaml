@@ -7,13 +7,22 @@ directories:
   model_dir: ./models
   output_dir: ./output
 
+method_name: base_bnorm_no_affine
+
+load_pretrained: No
+pretrained_path:
+
 network:
-  kernel_size: 5
+  kernel_size: 7
   dilation: 1
 
+  batch_norm_params:
+    affine: Yes
+
+
 training:
-  batch_size: 32
-  learning_rate: 1e-3
+  batch_size: 16
+  learning_rate: 1e-4
   epochs: 50
   test_split: 20
   validation_split: 10
@@ -21,5 +30,3 @@ training:
 
   optimizer: adam
   loss: binary_crossentropy
-
-  device: gpu
