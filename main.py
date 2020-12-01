@@ -1,13 +1,15 @@
 from pathlib import Path
 
 import yaml
-from torch import nn
+from torch import nn, manual_seed
 import pytorch_lightning as pl
 from sklearn.metrics import confusion_matrix
 
 from data_loader import get_data_loaders
 from network import SmileClassifier
 from tools import read_yaml
+
+manual_seed(42)  # Reproducibility for testing
 
 
 def main():

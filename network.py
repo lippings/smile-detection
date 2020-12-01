@@ -71,6 +71,7 @@ class SmileClassifier(pl.LightningModule):
         )
 
         self.val_accuracy = pl.metrics.Accuracy()
+        self.train_accuracy = pl.metrics.Accuracy()
     
     def forward(self, x, transform_label=True):
         h = self.conv(x)
@@ -83,20 +84,16 @@ class SmileClassifier(pl.LightningModule):
         return y
 
     def configure_optimizers(self):
-        optimizers = {
-            'adam': lambda params: optim.Adam(params, lr=self._learning_rate)
-        }
-
-        opt_getter = optimizers.get(self._optimizer_name, None)
-        if opt_getter is None:
-            msg = f'Unrecognized optimizer {self._optimizer_name}. Currently recognized:' \
-                  f'\n{", ".join(optimizers.keys())}'
+        if self._optimizer_name == 'adam':
+            optimizer = optim.Adam(
+                chain.from_iterable([self.conv.parameters(), self.fc.parameters()]),
+                lr=self._learning_rate
+            )
+        else:
+            msg = f'Unrecognized optimizer {self._optimizer_name}'
 
             raise AttributeError(msg)
 
-        optimizer = opt_getter(
-            chain.from_iterable([self.conv.parameters(), self.fc.parameters()])
-        )
         return optimizer
     
     def training_step(self, train_batch, batch_idx):
@@ -106,7 +103,10 @@ class SmileClassifier(pl.LightningModule):
         y_hat = self.fc(h).squeeze()
 
         loss = self.loss_func(y_hat, y)
+        acc = self.train_accuracy(y_hat, y)
+
         self.log('train_loss', loss)
+        self.log('dev_acc', acc, prog_bar=True, on_step=True)
         
         return loss
     
@@ -123,13 +123,16 @@ class SmileClassifier(pl.LightningModule):
         acc = self.val_accuracy(outputs['pred'], outputs['target'])
         loss = outputs['loss']
 
-        self.log('val_loss', loss, prog_bar=True, on_epoch=True, on_step=False)
-        self.log('val_acc', acc, prog_bar=True, on_epoch=True, on_step=False)
+        self.log('val_loss', loss)
+        self.log('val_acc', acc)
         
     def validation_epoch_end(self, outputs):
         acc = self.val_accuracy.compute()
 
         self.log('Validation accuracy', acc)
+
+        print(flush=True)
+        print(f'Validation accuracy: {acc.item()}', flush=True)
     
     def test_step(self, test_batch, batch_idx):
         predictions = self.forward(test_batch, transform_label=True)
