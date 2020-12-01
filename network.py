@@ -5,7 +5,7 @@ import pytorch_lightning as pl
 from tools import read_yaml
 
 
-class SmileClassifier(pl.LightningModule):
+class SmileClassifier(nn.Module):
     def __init__(self):
         super().__init__()
 
@@ -36,16 +36,19 @@ class SmileClassifier(pl.LightningModule):
 
         self.conv = nn.Sequential(
             nn.Conv2d(3, 32, **conv_kwargs),
+            # nn.Dropout(0.05),
             nn.BatchNorm2d(32, **batch_norm_kwargs),
             nn.ReLU(),
             nn.MaxPool2d(**maxpool_kwargs),
 
             nn.Conv2d(32, 32, **conv_kwargs),
+            # nn.Dropout(0.05),
             nn.BatchNorm2d(32, **batch_norm_kwargs),
             nn.ReLU(),
             nn.MaxPool2d(**maxpool_kwargs),
 
             nn.Conv2d(32, 32, **conv_kwargs),
+            # nn.Dropout(0.05),
             nn.BatchNorm2d(32, **batch_norm_kwargs),
             nn.ReLU(),
             nn.MaxPool2d(**maxpool_kwargs),
@@ -54,7 +57,8 @@ class SmileClassifier(pl.LightningModule):
         self.fc = nn.Sequential(
             nn.Flatten(),
             nn.Linear(2048, 128),
-            # nn.BatchNorm1d(128, **batch_norm_kwargs),
+            nn.Dropout(0.25),
+            nn.BatchNorm1d(128, **batch_norm_kwargs),
             nn.ReLU(),
             nn.Linear(128, 1),
             nn.Sigmoid()

@@ -59,10 +59,23 @@ def get_data_loaders(dataset_dir: Path, batch_size: int, validation_split: float
     
     train_split = 1 - validation_split - test_split
     
-    dataset = GENKIDataset(dataset_dir)
+    dataset = GENKIDataset(
+        dataset_dir,
+        # Add augmentations and normalization
+        transform=transforms.Compose([
+            transforms.Normalize(mean=[0.5, 0.5, 0.5], std=[0.5, 0.5, 0.5])
+        ])
+    )
     split_lengths = [len(dataset) * split_size for split_size in [train_split, validation_split, test_split]]
     split_lengths = [int(i) for i in split_lengths]
     train_set, validation_set, test_set = random_split(dataset, split_lengths)
+
+    train_set.transform = transforms.Compose([
+        transforms.RandomHorizontalFlip(),
+        transforms.RandomRotation(20),
+        transforms.Normalize(mean=[0.5, 0.5, 0.5], std=[0.5, 0.5, 0.5]),
+        transforms.RandomErasing(0.5)
+    ])
 
     train_loader = DataLoader(train_set, batch_size=batch_size, shuffle=shuffle)
     validation_loader = DataLoader(validation_set, batch_size=batch_size)

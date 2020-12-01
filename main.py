@@ -1,19 +1,21 @@
 from pathlib import Path
 
-import yaml
 from numpy import mean
 from numpy import save as save_obj
 import torch
 from torch import nn
 from torch.nn import functional as F
-import pytorch_lightning as pl
 from sklearn.metrics import confusion_matrix, accuracy_score
 import matplotlib.pyplot as plt
 from tqdm import trange
+from torchsummary import summary
+from mlxtend.plotting import plot_confusion_matrix
 
 from data_loader import get_data_loaders
 from network import SmileClassifier
 from tools import read_yaml
+
+torch.manual_seed(42)  # For testing
 
 
 class MetricEvaluator():
@@ -39,6 +41,22 @@ class MetricEvaluator():
         )
 
 
+def get_optimizer(params, config):
+    opt_name = config['training']['optimizer'].lower()
+    opt_params = config['training']['optimizer_params']
+
+    lr = float(opt_params['learning_rate'])
+    momentum = opt_params['momentum']
+    weight_decay = opt_params['weight_decay']
+
+    if opt_name == 'adam':
+        optimizer = torch.optim.Adam(params, lr=lr, weight_decay=weight_decay)
+    elif opt_name == 'sgd':
+        optimizer = torch.optim.SGD(params, lr=lr, momentum=momentum, weight_decay=weight_decay)
+
+    return optimizer
+
+
 def main():
     config = read_yaml(Path('config/main_settings.yaml'))
 
@@ -52,24 +70,21 @@ def main():
 
     name = config['method_name']
     out_folder = Path(config['directories']['output_dir']) / name
-    model_folder = Path(config['directories']['output_dir'])
+    model_folder = Path(config['directories']['model_dir'])
 
     out_folder.mkdir(parents=True, exist_ok=True)
     model_folder.mkdir(parents=True, exist_ok=True)
 
+    device = 'cuda' if torch.cuda.is_available() and config['training']['device'] == 'gpu' else 'cpu'
+
     model = SmileClassifier().float()
+    summary(model, (3, 64, 64), config['training']['batch_size'], device='cpu')
 
     if config['workflow']['train']:
-        # trainer.fit(model, train_loader, val_loader)
-
-        # Giving up on pl
-        device = 'cuda' if torch.cuda.is_available() else 'cpu'
-
         model = model.to(device)
 
         epochs = config['training']['epochs']
-        lr = float(config['training']['learning_rate'])
-        optimizer = torch.optim.Adam(model.parameters(), lr=lr)
+        optimizer = get_optimizer(model.parameters(), config)
         loss_func = F.binary_cross_entropy
         accuracy_eval = MetricEvaluator('accuracy')
 
@@ -85,7 +100,7 @@ def main():
 
         best_acc = 0
 
-        for epoch_id in range(epochs):
+        for epoch_id in range(1, epochs + 1):
             print(f'Epoch {epoch_id}')
 
             # Train loop
@@ -113,7 +128,7 @@ def main():
                 acc = accuracy_eval(y_hat, y)
                 batch_accs.append(acc)
 
-                t.set_postfix_str(s=f'loss={loss.item():.4f}, acc={acc:.3f}', refresh=True)
+                t.set_postfix_str(s=f'loss={mean(batch_losses):.4f}, acc={mean(batch_accs):.3f}', refresh=True)
 
             bloss = mean(batch_losses)
             bacc = mean(batch_accs)
@@ -123,6 +138,7 @@ def main():
             losses['dev'].append(bloss)
             accuracies['dev'].append(bacc)
 
+            # Validation loop
             model.eval()
             with torch.no_grad():
                 batch_losses = []
@@ -153,18 +169,22 @@ def main():
 
                     torch.save(model.state_dict(), str(model_folder / f'model_{name}'))
 
-    save_obj(str(out_folder / 'loss_history.npy'), losses)
-    save_obj(str(out_folder / 'acc_history.npy'), accuracies)
+        save_obj(str(out_folder / 'loss_history.npy'), losses)
+        save_obj(str(out_folder / 'acc_history.npy'), accuracies)
 
-    plt.figure()
-    plt.title('Accuracy history')
-    plt.ylabel('Accuracy')
-    plt.xlabel('Epoch')
-    plt.grid()
-    plt.plot(accuracies['dev'])
-    plt.plot(accuracies['val'])
-    plt.legend(['Training', 'Validation'])
-    plt.savefig(str(out_folder / f'acc_history.png'))
+        def save_history_plot(name, dev_vals, val_vals):
+            plt.figure()
+            plt.title(f'{name.capitalize()} history')
+            plt.ylabel(name.capitalize())
+            plt.xlabel('Epoch')
+            plt.grid()
+            plt.plot(dev_vals)
+            plt.plot(val_vals)
+            plt.legend(['Training', 'Validation'])
+            plt.savefig(str(out_folder / f'{name}_history.png'))
+
+        save_history_plot('accuracy', accuracies['dev'], accuracies['val'])
+        save_history_plot('loss', losses['dev'], losses['val'])
     
     if config['workflow']['test']:
         if config['load_pretrained']:
@@ -181,11 +201,32 @@ def main():
         pred = []
         gt = []
         print('Testing')
+        model = model.to(device)
         model.eval()
         with torch.no_grad():
             for x, y in test_loader:
-                # TODO: Confusion matrix
-                pass
+                x = x.to(device)
+
+                y_hat = torch.round(model(x))
+
+                y = y.detach().cpu().numpy().tolist()
+                y_hat = y_hat.detach().cpu().numpy().tolist()
+
+                try:
+                    pred.extend(y_hat)
+                    gt.extend(y)
+                except TypeError:
+                    # y_hat and y are floats
+                    pred.append(y_hat)
+                    gt.append(y)
+
+            test_acc = accuracy_score(gt, pred)
+            cm = confusion_matrix(gt, pred)
+
+            print()
+            print(f'Test accuracy: {test_acc}')
+            print('Confusion_matrix')
+            print(cm)
 
 
 if __name__ == '__main__':

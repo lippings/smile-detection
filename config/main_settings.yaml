@@ -7,18 +7,17 @@ directories:
   model_dir: ./models
   output_dir: ./output
 
-method_name: base_bnorm_no_affine
+method_name: reg_adam
 
 load_pretrained: No
 pretrained_path:  # Empty to use automatically saved weights based on method_name
 
 network:
-  kernel_size: 7
+  kernel_size: 5
   dilation: 1
 
   batch_norm_params:
-    affine: Yes
-
+    affine: No
 
 training:
   batch_size: 16
@@ -29,4 +28,11 @@ training:
   shuffle: Yes
 
   optimizer: adam
+  optimizer_params:
+    learning_rate: 1e-4
+    momentum: 0.8
+    weight_decay: 0.2
+
   loss: binary_crossentropy
+
+  device: gpu
