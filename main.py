@@ -19,7 +19,8 @@ def main():
         Path(config['directories']['dataset_dir']),
         config['training']['batch_size'],
         config['training']['validation_split'],
-        config['training']['test_split']
+        config['training']['test_split'],
+        config['training']['shuffle']
     )
 
     model = SmileClassifier().float()
@@ -56,9 +57,7 @@ def main():
         trainer.fit(model, train_loader, val_loader)
     
     if config['workflow']['test']:
-        for test_batch in test_loader:
-            # TODO: Confusion matrix
-            pass
+        trainer.test(model, test_loader, ckpt_path='models/smile-rec-best-v6.ckpt')
 
 
 if __name__ == '__main__':

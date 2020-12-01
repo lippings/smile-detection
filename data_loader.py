@@ -49,7 +49,11 @@ class GENKIDataset(Dataset):
         return len(self._labels)
 
 
-def get_data_loaders(dataset_dir: Path, batch_size: int, validation_split: float, test_split: float) \
+def get_data_loaders(dataset_dir: Path,
+                     batch_size: int,
+                     validation_split: float,
+                     test_split: float,
+                     shuffle: bool = True) \
         -> Tuple[DataLoader, DataLoader, DataLoader]:
     if test_split > 1:
         test_split /= 100.
@@ -64,7 +68,7 @@ def get_data_loaders(dataset_dir: Path, batch_size: int, validation_split: float
     split_lengths = [int(i) for i in split_lengths]
     train_set, validation_set, test_set = random_split(dataset, split_lengths)
 
-    train_loader = DataLoader(train_set, batch_size=batch_size)
+    train_loader = DataLoader(train_set, batch_size=batch_size, shuffle=shuffle)
     validation_loader = DataLoader(validation_set, batch_size=batch_size)
     test_loader = DataLoader(test_set, batch_size=1)
 
