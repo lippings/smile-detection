@@ -1,3 +1,5 @@
+from itertools import chain
+
 from numpy import round
 from torch import nn
 from torch import optim
@@ -13,27 +15,22 @@ class SmileClassifier(pl.LightningModule):
 
         config = read_yaml('config/main_settings.yaml')
 
-        loss = config['training']['loss'].lower()
-        optimizer = config['training']['optimizer'].lower()
+        loss_name = config['training']['loss'].lower()
         kernel_size = config['network']['kernel_size']
         dilation = config['network']['dilation']
-        learning_rate = float(config['training']['learning_rate'])
+
+        self._optimizer_name = config['training']['optimizer'].lower()
+        self._learning_rate = float(config['training']['learning_rate'])
 
         losses = {
             'binary_crossentropy': F.binary_cross_entropy
         }
 
-        optimizers = {
-            'adam': lambda: optim.Adam(self.parameters(), lr=learning_rate)
-        }
-
-        self.loss_func = losses.get(loss, None)
+        self.loss_func = losses.get(loss_name, None)
         if self.loss_func is None:
-            print(f'Unrecognized loss function {loss}. Currently recognized:\n{", ".join(losses.keys())}')
-        
-        self.opt_getter = optimizers.get(optimizer, None)
-        if self.opt_getter is None:
-            print(f'Unrecognized optimizer {optimizer}. Currently recognized:\n{", ".join(optimizers.keys())}')
+            msg = f'Unrecognized loss function {loss_name}. Currently recognized:\n{", ".join(losses.keys())}'
+
+            raise AttributeError(msg)
 
         padding = ((kernel_size - 1) / 2) * dilation
 
@@ -86,7 +83,21 @@ class SmileClassifier(pl.LightningModule):
         return y
 
     def configure_optimizers(self):
-        return self.opt_getter()
+        optimizers = {
+            'adam': lambda params: optim.Adam(params, lr=self._learning_rate)
+        }
+
+        opt_getter = optimizers.get(self._optimizer_name, None)
+        if opt_getter is None:
+            msg = f'Unrecognized optimizer {self._optimizer_name}. Currently recognized:' \
+                  f'\n{", ".join(optimizers.keys())}'
+
+            raise AttributeError(msg)
+
+        optimizer = opt_getter(
+            chain.from_iterable([self.conv.parameters(), self.fc.parameters()])
+        )
+        return optimizer
     
     def training_step(self, train_batch, batch_idx):
         x, y = train_batch
@@ -112,8 +123,8 @@ class SmileClassifier(pl.LightningModule):
         acc = self.val_accuracy(outputs['pred'], outputs['target'])
         loss = outputs['loss']
 
-        self.log('val_loss', loss)
-        self.log('val_acc', acc)
+        self.log('val_loss', loss, prog_bar=True, on_epoch=True, on_step=False)
+        self.log('val_acc', acc, prog_bar=True, on_epoch=True, on_step=False)
         
     def validation_epoch_end(self, outputs):
         acc = self.val_accuracy.compute()
