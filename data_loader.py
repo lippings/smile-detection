@@ -12,7 +12,7 @@ import cv2
 
 
 class GENKIDataset(Dataset):
-    def __init__(self, dataset_dir: Path, transform=None):
+    def __init__(self, dataset_dir: Path, transform=None, train_transform=None):
         super().__init__()
 
         self._dset_root = dataset_dir.joinpath('GENKI-R2009a/Subsets/GENKI-4K')
@@ -26,11 +26,17 @@ class GENKIDataset(Dataset):
         self._labels = [row[0] for row in self._read_csv(label_file)]
 
         self.transform = transform
+        self.train_transform = train_transform
+
+        self.training = False
     
     def _read_csv(self, path: Path):
         with path.open('r') as f:
             reader = csv.reader(f, delimiter=' ')
             return [row for row in reader]
+
+    def train(self):
+        self.training = True
     
     def __getitem__(self, index):
         label = float32(self._labels[index])
@@ -42,6 +48,9 @@ class GENKIDataset(Dataset):
 
         tensor_image = from_numpy(res_image).permute(2, 0, 1)  # H, W, C -> C, H, W
         tensor_image = tensor_image.float()
+
+        if self.training:
+            tensor_image = self.train_transform(tensor_image)
 
         return tensor_image, label
 
@@ -64,21 +73,22 @@ def get_data_loaders(dataset_dir: Path, batch_size: int, validation_split: float
         # Add augmentations and normalization
         transform=transforms.Compose([
             transforms.Normalize(mean=[0.5, 0.5, 0.5], std=[0.5, 0.5, 0.5])
+        ]),
+        train_transform=transforms.Compose([
+            transforms.RandomHorizontalFlip(),
+            transforms.RandomRotation(20),
+            transforms.Normalize(mean=[0.5, 0.5, 0.5], std=[0.5, 0.5, 0.5]),
+            transforms.RandomErasing(0.5)
         ])
     )
     split_lengths = [len(dataset) * split_size for split_size in [train_split, validation_split, test_split]]
     split_lengths = [int(i) for i in split_lengths]
     train_set, validation_set, test_set = random_split(dataset, split_lengths)
 
-    train_set.transform = transforms.Compose([
-        transforms.RandomHorizontalFlip(),
-        transforms.RandomRotation(20),
-        transforms.Normalize(mean=[0.5, 0.5, 0.5], std=[0.5, 0.5, 0.5]),
-        transforms.RandomErasing(0.5)
-    ])
+    train_set.dataset.train()
 
     train_loader = DataLoader(train_set, batch_size=batch_size, shuffle=shuffle)
     validation_loader = DataLoader(validation_set, batch_size=batch_size)
-    test_loader = DataLoader(test_set, batch_size=1)
+    test_loader = DataLoader(test_set, batch_size=batch_size)
 
     return train_loader, validation_loader, test_loader
