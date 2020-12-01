@@ -19,6 +19,8 @@ class SmileClassifier(pl.LightningModule):
         kernel_size = config['network']['kernel_size']
         dilation = config['network']['dilation']
 
+        batch_norm_kwargs = config['network']['batch_norm_params']
+
         self._optimizer_name = config['training']['optimizer'].lower()
         self._learning_rate = float(config['training']['learning_rate'])
 
@@ -52,12 +54,20 @@ class SmileClassifier(pl.LightningModule):
 
         self.conv = nn.Sequential(
             nn.Conv2d(3, 32, **conv_kwargs),
+            # nn.Dropout(0.05),
+            nn.BatchNorm2d(32, **batch_norm_kwargs),
             nn.ReLU(),
             nn.MaxPool2d(**maxpool_kwargs),
+
             nn.Conv2d(32, 32, **conv_kwargs),
+            # nn.Dropout(0.05),
+            nn.BatchNorm2d(32, **batch_norm_kwargs),
             nn.ReLU(),
             nn.MaxPool2d(**maxpool_kwargs),
+
             nn.Conv2d(32, 32, **conv_kwargs),
+            # nn.Dropout(0.05),
+            nn.BatchNorm2d(32, **batch_norm_kwargs),
             nn.ReLU(),
             nn.MaxPool2d(**maxpool_kwargs),
         )
@@ -65,6 +75,8 @@ class SmileClassifier(pl.LightningModule):
         self.fc = nn.Sequential(
             nn.Flatten(),
             nn.Linear(2048, 128),
+            nn.Dropout(0.25),
+            nn.BatchNorm1d(128, **batch_norm_kwargs),
             nn.ReLU(),
             nn.Linear(128, 1),
             nn.Sigmoid()

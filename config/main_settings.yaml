@@ -11,8 +11,11 @@ network:
   kernel_size: 5
   dilation: 1
 
+  batch_norm_params:
+    affine: No
+
 training:
-  batch_size: 32
+  batch_size: 16
   learning_rate: 1e-4
   epochs: 50
   test_split: 20
