@@ -1,4 +1,3 @@
-from numpy import round
 from torch import nn
 from torchvision.models import mobilenet_v2, resnet50
 from torchvision.transforms import Resize
