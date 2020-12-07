@@ -3,8 +3,6 @@ from pathlib import Path
 from numpy import mean
 from numpy import save as save_obj
 import torch
-from torch import nn
-from torch.nn import functional as F
 from sklearn.metrics import confusion_matrix, accuracy_score
 import matplotlib.pyplot as plt
 from tqdm import trange
@@ -12,13 +10,13 @@ from torchsummary import summary
 from mlxtend.plotting import plot_confusion_matrix
 
 from data_loader import get_data_loaders
-from network import SmileClassifier
-from tools import read_yaml
+from tools import read_yaml, archive_settings
+from method_helpers import get_model_path, get_model, get_loss_func, get_optimizer
 
 torch.manual_seed(42)  # For testing
 
 
-class MetricEvaluator():
+class MetricEvaluator:
     def __init__(self, metric_name):
         self._metric_functions = {
             'accuracy': accuracy_score
@@ -41,24 +39,10 @@ class MetricEvaluator():
         )
 
 
-def get_optimizer(params, config):
-    opt_name = config['training']['optimizer'].lower()
-    opt_params = config['training']['optimizer_params']
-
-    lr = float(opt_params['learning_rate'])
-    momentum = opt_params['momentum']
-    weight_decay = opt_params['weight_decay']
-
-    if opt_name == 'adam':
-        optimizer = torch.optim.Adam(params, lr=lr, weight_decay=weight_decay)
-    elif opt_name == 'sgd':
-        optimizer = torch.optim.SGD(params, lr=lr, momentum=momentum, weight_decay=weight_decay)
-
-    return optimizer
-
-
 def main():
     config = read_yaml(Path('config/main_settings.yaml'))
+
+    archive_settings(config)
 
     train_loader, val_loader, test_loader = get_data_loaders(
         Path(config['directories']['dataset_dir']),
@@ -77,15 +61,15 @@ def main():
 
     device = 'cuda' if torch.cuda.is_available() and config['training']['device'] == 'gpu' else 'cpu'
 
-    model = SmileClassifier().float()
+    model = get_model(config).float()
     summary(model, (3, 64, 64), config['training']['batch_size'], device='cpu')
 
     if config['workflow']['train']:
         model = model.to(device)
 
         epochs = config['training']['epochs']
-        optimizer = get_optimizer(model.parameters(), config)
-        loss_func = F.binary_cross_entropy
+        optimizer, scheduler = get_optimizer(model.parameters(), config)
+        loss_func = get_loss_func(config)
         accuracy_eval = MetricEvaluator('accuracy')
 
         losses = {
@@ -98,7 +82,7 @@ def main():
             'val': []
         }
 
-        best_acc = 0
+        best_loss = 1e6
 
         for epoch_id in range(1, epochs + 1):
             print(f'Epoch {epoch_id}')
@@ -162,10 +146,16 @@ def main():
                 losses['val'].append(bloss)
                 accuracies['val'].append(bacc)
 
+                if scheduler is not None:
+                    if config['training']['scheduler'].lower() != 'plateau':
+                        scheduler.step()
+                    else:
+                        scheduler.step(bloss)
+
                 print(f' loss: {bloss} acc: {bacc}')
 
-                if bacc > best_acc:
-                    best_acc = bacc
+                if bloss < best_loss:
+                    best_loss = bloss
 
                     torch.save(model.state_dict(), str(model_folder / f'model_{name}'))
 
@@ -188,13 +178,7 @@ def main():
     
     if config['workflow']['test']:
         if config['load_pretrained']:
-            if config['pretrained_path'] is None:
-                model_path = str(model_folder / f'model_{name}')
-            else:
-                model_path = config['pretrained_path']
-
-            if not Path(model_path).exists():
-                raise AttributeError(f'Could not find model weights in {model_path}')
+            model_path = get_model_path(config)
 
             model.load_state_dict(torch.load(model_path))
 
@@ -224,9 +208,15 @@ def main():
             cm = confusion_matrix(gt, pred)
 
             print()
+            print(f'Results for method {name}')
             print(f'Test accuracy: {test_acc}')
             print('Confusion_matrix')
             print(cm)
+
+            plot_confusion_matrix(cm, class_names=['No smile', 'Smile'])
+
+            plt.title('Confusion matrix, test accuracy: {test_acc:.2f}')
+            plt.savefig(str(out_folder / f'{name}_confusion.png'))
 
 
 if __name__ == '__main__':

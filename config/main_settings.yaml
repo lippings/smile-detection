@@ -2,26 +2,34 @@ workflow:
   train: Yes
   test: Yes
 
+demo:
+  max_fps: 120  # Actual fps could be lower, depending on hardware
+  fps_avg_nb: 20  # Over how many samples to average to get fps
+
 directories:
   dataset_dir: ./genki4k
   model_dir: ./models
   output_dir: ./output
 
-method_name: reg_adam
+method_name: base_model
 
 load_pretrained: No
 pretrained_path:  # Empty to use automatically saved weights based on method_name
 
 network:
+  pretrained_name: #mobilenetv2  # Leave empty to use the base model instead
+  finetune: Yes
+
   kernel_size: 5
-  dilation: 1
+  dilation: 2
+
+  activation: relu
 
   batch_norm_params:
     affine: No
 
 training:
   batch_size: 16
-  learning_rate: 1e-4
   epochs: 50
   test_split: 20
   validation_split: 10
@@ -29,9 +37,22 @@ training:
 
   optimizer: adam
   optimizer_params:
-    learning_rate: 1e-4
-    momentum: 0.8
-    weight_decay: 0.2
+    adam:
+      lr: 0.0001  # Initial lr, if using scheduler
+      weight_decay: 0.1
+    sgd:
+      momentum: 0.8
+    adamw:
+      lr: 0.0001
+
+  scheduler: plateau  # Leave empty for no scheduling
+  scheduler_params:
+    exponential:
+      gamma: 0.9
+    plateau:
+      patience: 5
+      factor: 0.5
+      verbose: Yes
 
   loss: binary_crossentropy
 
